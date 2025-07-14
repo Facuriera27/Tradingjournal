@@ -10,7 +10,7 @@ if 'trades_df' not in st.session_state:
     st.session_state.trades_df = pd.DataFrame()
 
 # Tab layout for different input methods
-tab1, tab2 = st.tabs(["📤 Subir CSV", "✍️ Ingresar Manualmente"])
+tab1, tab2 = st.tabs(["📤 Subir CSV", "✏️ Ingresar Manualmente"])
 
 with tab1:
     # 1. CSV Upload functionality
@@ -24,6 +24,10 @@ with tab1:
             df = df[df['Profit (USD)'] != 0]
             df['Duration (hours)'] = (pd.to_datetime(df['Close Time']) - pd.to_datetime(df['Open Time'])).dt.total_seconds() / 3600
             df['Result'] = df['Profit (USD)'].apply(lambda x: 'Win' if x > 0 else 'Loss')
+            
+            # Remove 'Order ID' column if it exists
+            if 'Order ID' in df.columns:
+                df = df.drop(columns=['Order ID'])
             
             # Store in session state
             st.session_state.trades_df = df
@@ -102,16 +106,13 @@ if not st.session_state.trades_df.empty:
         df['Result'] = df['Profit (USD)'].apply(lambda x: 'Win' if x > 0 else 'Loss')
     
     # 3. Show data and analysis
-    st.subheader("📜 Tabla de Trades Completa")
+    st.subheader("📋 Tabla de Trades Completa")
     st.dataframe(df)  # Show DataFrame as interactive table
     
-    st.subheader("📊 Resumen Estadístico")
-    st.write(df.describe())  # Basic statistics
-    
-    st.subheader("🎯 Trades Ganados vs Perdidos")
+    st.subheader("📊 Trades Ganados vs Perdidos")
     st.bar_chart(df['Result'].value_counts())  # Bar chart
     
-    # 5. NEW: Monthly Profit/Loss Analysis
+    # 5. Monthly Profit/Loss Analysis
     st.subheader("📅 Resultados Mensuales")
     
     # Extract month and year from Close Time
