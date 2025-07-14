@@ -113,22 +113,29 @@ if not st.session_state.trades_df.empty:
     st.bar_chart(df['Result'].value_counts())  # Bar chart
     
     # 5. Monthly Profit/Loss Analysis
-    st.subheader("📅 Resultados Mensuales")
-    
-    # Extract month and year from Close Time
-    df['Close Time'] = pd.to_datetime(df['Close Time'])
-    df['Month-Year'] = df['Close Time'].dt.to_period('M').astype(str)
-    
-    # Calculate monthly profit
-    monthly_results = df.groupby('Month-Year')['Profit (USD)'].sum().reset_index()
-    monthly_results['Result'] = monthly_results['Profit (USD)'].apply(lambda x: 'Positivo' if x > 0 else 'Negativo')
-    
-    # Create bar chart
-    st.bar_chart(monthly_results.set_index('Month-Year')['Profit (USD)'])
-    
-    # Display monthly summary table
-    st.write("Resumen Mensual:")
-    st.dataframe(monthly_results)
+st.subheader("📅 Resultados Mensuales")
+
+# Extract month and year from Close Time
+df['Close Time'] = pd.to_datetime(df['Close Time'])
+df['Month-Year'] = df['Close Time'].dt.to_period('M').astype(str)
+
+# Calculate monthly profit
+monthly_results = df.groupby('Month-Year')['Profit (USD)'].sum().reset_index()
+monthly_results['Result'] = monthly_results['Profit (USD)'].apply(lambda x: 'Positivo' if x > 0 else 'Negativo')
+
+# Create bar chart
+st.bar_chart(monthly_results.set_index('Month-Year')['Profit (USD)'])
+
+# Display monthly summary table with colored results
+st.write("Resumen Mensual:")
+
+# Create a styled DataFrame for display
+def color_result(val):
+    color = 'green' if val == 'Positivo' else 'red'
+    return f'color: {color}'
+
+styled_monthly = monthly_results.style.applymap(color_result, subset=['Result'])
+st.dataframe(styled_monthly)
     
     # 4. Interactive filters
     st.sidebar.subheader("🔍 Filtros")
