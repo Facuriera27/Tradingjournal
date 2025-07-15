@@ -94,7 +94,7 @@ with tab2:
             else:
                 st.warning("Por favor complete los campos requeridos (Symbol, Size, Price)")
 
-# Display data and analysis only if we have trades
+# Display analysis only if we have trades
 if not st.session_state.trades_df.empty:
     df = st.session_state.trades_df
     
@@ -105,14 +105,11 @@ if not st.session_state.trades_df.empty:
     if 'Result' not in df.columns:
         df['Result'] = df['Profit (USD)'].apply(lambda x: 'Win' if x > 0 else 'Loss')
     
-    # 3. Show data and analysis
-    st.subheader("📋 Tabla de Trades Completa")
-    st.dataframe(df)  # Show DataFrame as interactive table
-    
+    # Show analysis charts
     st.subheader("📊 Trades Ganados vs Perdidos")
     st.bar_chart(df['Result'].value_counts())  # Bar chart
     
-    # 5. Monthly Profit/Loss Analysis
+    # Monthly Profit/Loss Analysis
     st.subheader("📅 Resultados Mensuales")
     
     # Extract month and year from Close Time
@@ -137,13 +134,6 @@ if not st.session_state.trades_df.empty:
     # Aplicar estilo y mostrar el DataFrame
     styled_monthly = monthly_results.style.applymap(color_result, subset=['Result'])
     st.dataframe(styled_monthly)
-    
-    # 4. Interactive filters
-    st.sidebar.subheader("🔍 Filtros")
-    symbol_filter = st.sidebar.selectbox("Filtrar por símbolo:", df['Symbol'].unique())
-    filtered_df = df[df['Symbol'] == symbol_filter]
-    st.write(f"Trades filtrados para {symbol_filter}:")
-    st.dataframe(filtered_df)
     
     # Download button for the combined data
     st.sidebar.download_button(
