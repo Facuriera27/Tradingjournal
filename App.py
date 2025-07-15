@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import time
+import numpy as np
 
 st.title("📊 Análisis de Trades en Tiempo Real")
 
@@ -75,9 +76,9 @@ with tab2:
                     'Commission': commission,
                     'Fees': fees,
                     'Profit (USD)': profit,
-                    'Close Time': f"{trade_date} {trade_time}",  # Using same as open time for simplicity
-                    'Take Profit': None,  # Can be added to form if needed
-                    'Stop Loss': None     # Can be added to form if needed
+                    'Close Time': f"{trade_date} {trade_time}",
+                    'Take Profit': None,
+                    'Stop Loss': None
                 }
                 
                 # Convert to DataFrame and append to existing data
@@ -105,15 +106,71 @@ if not st.session_state.trades_df.empty:
     if 'Result' not in df.columns:
         df['Result'] = df['Profit (USD)'].apply(lambda x: 'Win' if x > 0 else 'Loss')
     
-    # Show analysis charts
-    st.subheader("📊 Trades Ganados vs Perdidos")
-    st.bar_chart(df['Result'].value_counts())  # Bar chart
+    # Ensure datetime format
+    df['Close Time'] = pd.to_datetime(df['Close Time'])
     
-    # Monthly Profit/Loss Analysis
+    # 1. Análisis de Win/Loss a lo largo del tiempo
+    st.subheader("📈 Evolución de Wins/Losses en el Tiempo")
+    
+    # Create a cumulative win/loss count
+    df_sorted = df.sort_values('Close Time')
+    df_sorted['Win_Cumulative'] = (df_sorted['Result'] == 'Win').cumsum()
+    df_sorted['Loss_Cumulative'] = (df_sorted['Result'] == 'Loss').cumsum()
+    
+    # Plot cumulative wins/losses
+    st.line_chart(df_sorted.set_index('Close Time')[['Win_Cumulative', 'Loss_Cumulative']])
+    
+    # 2. Evolución del capital
+    st.subheader("💰 Evolución del Capital")
+    
+    # Calculate cumulative profit
+    df_sorted['Cumulative_Profit'] = df_sorted['Profit (USD)'].cumsum()
+    
+    # Plot capital growth
+    st.line_chart(df_sorted.set_index('Close Time')['Cumulative_Profit'])
+    
+    # 3. Análisis por día de la semana
+    st.subheader("📅 Rendimiento por Día de la Semana")
+    
+    # Extract day of week (0=Monday, 6=Sunday)
+    df['Day_of_Week'] = df['Close Time'].dt.dayofweek
+    days = {0:'Lunes', 1:'Martes', 2:'Miércoles', 3:'Jueves', 4:'Viernes', 5:'Sábado', 6:'Domingo'}
+    df['Day_Name'] = df['Day_of_Week'].map(days)
+    
+    # Group by day of week
+    day_analysis = df.groupby('Day_Name').agg({
+        'Profit (USD)': ['sum', 'mean', 'count'],
+        'Result': lambda x: (x == 'Win').mean()  # Win rate
+    }).reset_index()
+    
+    day_analysis.columns = ['Día', 'Profit Total', 'Profit Promedio', 'Cantidad Trades', 'Win Rate']
+    
+    # Sort by day of week (not alphabetically)
+    day_analysis['Día'] = pd.Categorical(day_analysis['Día'], categories=days.values(), ordered=True)
+    day_analysis = day_analysis.sort_values('Día')
+    
+    # Display metrics
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.write("**Profit Total por Día:**")
+        st.bar_chart(day_analysis.set_index('Día')['Profit Total'])
+        
+    with col2:
+        st.write("**Win Rate por Día:**")
+        st.bar_chart(day_analysis.set_index('Día')['Win Rate'])
+    
+    st.write("**Métricas Detalladas por Día:**")
+    st.dataframe(day_analysis)
+    
+    # 4. Trades Ganados vs Perdidos (original)
+    st.subheader("📊 Trades Ganados vs Perdidos (Global)")
+    st.bar_chart(df['Result'].value_counts())
+    
+    # 5. Monthly Profit/Loss Analysis (original)
     st.subheader("📅 Resultados Mensuales")
     
-    # Extract month and year from Close Time
-    df['Close Time'] = pd.to_datetime(df['Close Time'])
+    # Extract month and year
     df['Month-Year'] = df['Close Time'].dt.to_period('M').astype(str)
     
     # Calculate monthly profit
@@ -126,12 +183,10 @@ if not st.session_state.trades_df.empty:
     # Display monthly summary table with colored results
     st.write("Resumen Mensual:")
     
-    # Función para aplicar colores
     def color_result(val):
         color = 'green' if val == 'Positivo' else 'red'
         return f'color: {color}'
     
-    # Aplicar estilo y mostrar el DataFrame
     styled_monthly = monthly_results.style.applymap(color_result, subset=['Result'])
     st.dataframe(styled_monthly)
     
