@@ -72,7 +72,43 @@ with tab1:
                 
                 st.session_state.trades_df = df
                 st.success("✅ Datos cargados correctamente!")
-                st.write("Muestra de datos:", df.head())
+                
+                # Análisis mes a mes
+                st.subheader("📅 Análisis Mes a Mes")
+                
+                # Preparar datos para análisis mensual
+                df['Close Time'] = pd.to_datetime(df['Close Time'])
+                df['Month'] = df['Close Time'].dt.to_period('M')
+                
+                # Agrupar por mes
+                monthly_analysis = df.groupby('Month').agg({
+                    'Profit (USD)': ['sum', 'count'],
+                    'Result': lambda x: (x == 'Win').sum()
+                }).round(2)
+                
+                # Aplanar columnas
+                monthly_analysis.columns = ['Total_Profit', 'Total_Trades', 'Winning_Trades']
+                monthly_analysis['Losing_Trades'] = monthly_analysis['Total_Trades'] - monthly_analysis['Winning_Trades']
+                monthly_analysis['Win_Rate'] = (monthly_analysis['Winning_Trades'] / monthly_analysis['Total_Trades'] * 100).round(1)
+                
+                # Mostrar tabla con colores
+                for month in monthly_analysis.index:
+                    row = monthly_analysis.loc[month]
+                    
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    with col1:
+                        st.write(f"**{month}**")
+                    
+                    with col2:
+                        profit_color = "🟢" if row['Total_Profit'] > 0 else "🔴"
+                        st.write(f"{profit_color} ${row['Total_Profit']:,.2f}")
+                    
+                    with col3:
+                        st.write(f"🟢 {int(row['Winning_Trades'])} | 🔴 {int(row['Losing_Trades'])}")
+                    
+                    with col4:
+                        st.write(f"📊 {row['Win_Rate']:.1f}% WR")
                 
         except Exception as e:
             st.error(f"❌ Error al procesar el archivo: {str(e)}")
