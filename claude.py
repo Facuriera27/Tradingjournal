@@ -4,6 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
 import time
+import numpy as np
 
 # Configuración de la página
 st.set_page_config(
@@ -37,6 +38,101 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown('<h1 class="main-header">📊 Trading Analytics Dashboard</h1>', unsafe_allow_html=True)
+
+# Función para crear el gráfico de calendario
+def create_calendar_heatmap(df, selected_month=None):
+    """
+    Crea un gráfico de calendario mostrando profit diario y número de trades
+    """
+    # Preparar datos diarios
+    df['Date'] = pd.to_datetime(df['Close Time']).dt.date
+    daily_data = df.groupby('Date').agg({
+        'Profit (USD)': ['sum', 'count']
+    }).round(2)
+    
+    # Aplanar columnas
+    daily_data.columns = ['Daily_Profit', 'Num_Trades']
+    daily_data = daily_data.reset_index()
+    
+    # Filtrar por mes si se especifica
+    if selected_month:
+        daily_data = daily_data[pd.to_datetime(daily_data['Date']).dt.to_period('M') == selected_month]
+    
+    if daily_data.empty:
+        return None
+    
+    # Preparar datos para el heatmap
+    daily_data['Year'] = pd.to_datetime(daily_data['Date']).dt.year
+    daily_data['Month'] = pd.to_datetime(daily_data['Date']).dt.month
+    daily_data['Day'] = pd.to_datetime(daily_data['Date']).dt.day
+    daily_data['Weekday'] = pd.to_datetime(daily_data['Date']).dt.day_name()
+    daily_data['Week'] = pd.to_datetime(daily_data['Date']).dt.isocalendar().week
+    
+    # Mapear días de la semana
+    weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    daily_data['Weekday_num'] = daily_data['Weekday'].map({day: i for i, day in enumerate(weekdays)})
+    
+    # Crear texto para hover
+    daily_data['Hover_text'] = daily_data.apply(lambda x: 
+        f"Fecha: {x['Date']}<br>" +
+        f"Profit: ${x['Daily_Profit']:,.2f}<br>" +
+        f"Trades: {int(x['Num_Trades'])}<br>" +
+        f"Promedio: ${x['Daily_Profit']/x['Num_Trades']:,.2f}",
+        axis=1
+    )
+    
+    # Crear el heatmap
+    fig = go.Figure()
+    
+    # Configurar escala de colores
+    max_abs_profit = max(abs(daily_data['Daily_Profit'].min()), abs(daily_data['Daily_Profit'].max()))
+    
+    fig.add_trace(go.Scatter(
+        x=daily_data['Week'],
+        y=daily_data['Weekday_num'],
+        mode='markers+text',
+        marker=dict(
+            size=40,
+            color=daily_data['Daily_Profit'],
+            colorscale=[[0, '#ef4444'], [0.5, '#f3f4f6'], [1, '#10b981']],
+            cmin=-max_abs_profit,
+            cmax=max_abs_profit,
+            showscale=True,
+            colorbar=dict(
+                title="Profit ($)",
+                titleside="right"
+            ),
+            line=dict(width=1, color='white')
+        ),
+        text=daily_data['Num_Trades'].astype(str),
+        textfont=dict(size=12, color='white'),
+        hovertemplate='%{customdata}<extra></extra>',
+        customdata=daily_data['Hover_text']
+    ))
+    
+    fig.update_layout(
+        title="📅 Calendario de Trading - Profit Diario y Número de Trades",
+        xaxis=dict(
+            title="Semana del Año",
+            tickmode='linear',
+            showgrid=True,
+            gridcolor='lightgray'
+        ),
+        yaxis=dict(
+            title="Día de la Semana",
+            tickmode='array',
+            tickvals=list(range(7)),
+            ticktext=weekdays,
+            showgrid=True,
+            gridcolor='lightgray'
+        ),
+        height=400,
+        showlegend=False,
+        plot_bgcolor='white',
+        font=dict(size=10)
+    )
+    
+    return fig
 
 # Inicializar datos en session_state
 if 'trades_df' not in st.session_state:
@@ -184,6 +280,42 @@ if not st.session_state.trades_df.empty:
     col2.metric("🎯 Win Rate", f"{win_rate:.1f}%")
     col3.metric("📊 Total Trades", f"{total_trades:,}")
     col4.metric("✅ Trades Ganadores", f"{winning_trades:,}")
+    
+    # NUEVO: Gráfico de calendario mensual
+    st.markdown("---")
+    st.subheader("📅 Vista de Calendario - Trading Diario")
+    
+    # Selector de mes para el calendario
+    df['Month_Period'] = pd.to_datetime(df['Close Time']).dt.to_period('M')
+    available_months = sorted(df['Month_Period'].unique())
+    
+    if len(available_months) > 1:
+        selected_month = st.selectbox(
+            "Selecciona un mes para el calendario:",
+            options=['Todos los meses'] + [str(month) for month in available_months],
+            key="month_selector"
+        )
+        
+        if selected_month != 'Todos los meses':
+            selected_month = pd.Period(selected_month)
+        else:
+            selected_month = None
+    else:
+        selected_month = available_months[0] if available_months else None
+    
+    # Crear y mostrar el gráfico de calendario
+    calendar_fig = create_calendar_heatmap(df, selected_month)
+    if calendar_fig:
+        st.plotly_chart(calendar_fig, use_container_width=True)
+        
+        # Información adicional del calendario
+        st.info("""
+        📋 **Cómo leer el gráfico de calendario:**
+        - 🟢 **Verde**: Días con ganancias
+        - 🔴 **Rojo**: Días con pérdidas  
+        - **Números**: Cantidad de trades realizados ese día
+        - **Hover**: Pasa el mouse para ver detalles del día
+        """)
     
     # Gráfico de evolución del capital
     st.markdown("---")
