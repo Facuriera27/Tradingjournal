@@ -2,9 +2,8 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime, timedelta
+from datetime import datetime
 import time
-import calendar
 
 # Configuración de la página
 st.set_page_config(
@@ -34,206 +33,8 @@ st.markdown("""
         box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         border-left: 4px solid #3b82f6;
     }
-    .calendar-container {
-        background: #1a1a1a;
-        border-radius: 15px;
-        padding: 20px;
-        margin: 20px 0;
-    }
-    .calendar-header {
-        text-align: center;
-        color: white;
-        font-size: 1.5rem;
-        font-weight: bold;
-        margin-bottom: 20px;
-    }
-    .calendar-grid {
-        display: grid;
-        grid-template-columns: repeat(7, 1fr);
-        gap: 5px;
-        max-width: 800px;
-        margin: 0 auto;
-    }
-    .calendar-day-header {
-        text-align: center;
-        color: #888;
-        font-weight: bold;
-        padding: 10px;
-        font-size: 0.9rem;
-    }
-    .calendar-day {
-        aspect-ratio: 1;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        border-radius: 8px;
-        min-height: 80px;
-        position: relative;
-        cursor: pointer;
-        transition: all 0.3s ease;
-    }
-    .calendar-day:hover {
-        transform: scale(1.05);
-        z-index: 10;
-    }
-    .day-number {
-        font-size: 1.1rem;
-        font-weight: bold;
-        color: white;
-        margin-bottom: 5px;
-    }
-    .day-profit {
-        font-size: 0.8rem;
-        font-weight: bold;
-        color: white;
-    }
-    .day-trades {
-        font-size: 0.7rem;
-        color: #ccc;
-    }
-    .positive-day {
-        background: linear-gradient(135deg, #10b981, #059669);
-        border: 1px solid #10b981;
-    }
-    .negative-day {
-        background: linear-gradient(135deg, #ef4444, #dc2626);
-        border: 1px solid #ef4444;
-    }
-    .neutral-day {
-        background: #2a2a2a;
-        border: 1px solid #404040;
-    }
-    .empty-day {
-        background: transparent;
-    }
-    .monthly-stats {
-        display: flex;
-        justify-content: space-around;
-        margin: 20px 0;
-        flex-wrap: wrap;
-    }
-    .stat-item {
-        text-align: center;
-        color: white;
-        padding: 10px;
-        background: #2a2a2a;
-        border-radius: 8px;
-        margin: 5px;
-        min-width: 120px;
-    }
-    .stat-value {
-        font-size: 1.2rem;
-        font-weight: bold;
-    }
-    .stat-label {
-        font-size: 0.8rem;
-        color: #888;
-    }
 </style>
 """, unsafe_allow_html=True)
-
-def create_trading_calendar(df, year, month):
-    """Crea un calendario de trading para un mes específico"""
-    
-    # Filtrar datos del mes
-    df['Date'] = pd.to_datetime(df['Close Time']).dt.date
-    month_df = df[
-        (pd.to_datetime(df['Close Time']).dt.year == year) & 
-        (pd.to_datetime(df['Close Time']).dt.month == month)
-    ]
-    
-    # Agrupar por día
-    daily_stats = month_df.groupby('Date').agg({
-        'Profit (USD)': ['sum', 'count']
-    }).round(2)
-    
-    daily_stats.columns = ['profit', 'trades']
-    daily_stats = daily_stats.reset_index()
-    
-    # Configurar calendario
-    cal = calendar.monthcalendar(year, month)
-    month_name = calendar.month_name[month]
-    
-    # Estadísticas del mes
-    total_profit = month_df['Profit (USD)'].sum()
-    total_trades = len(month_df)
-    winning_days = len(daily_stats[daily_stats['profit'] > 0])
-    losing_days = len(daily_stats[daily_stats['profit'] < 0])
-    
-    # HTML del calendario
-    calendar_html = f"""
-    <div class="calendar-container">
-        <div class="calendar-header">{month_name} {year}</div>
-        
-        <div class="monthly-stats">
-            <div class="stat-item">
-                <div class="stat-value" style="color: {'#10b981' if total_profit >= 0 else '#ef4444'}">${total_profit:,.2f}</div>
-                <div class="stat-label">Monthly P&L</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-value">{total_trades}</div>
-                <div class="stat-label">Total Trades</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-value" style="color: #10b981">{winning_days}</div>
-                <div class="stat-label">Winning Days</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-value" style="color: #ef4444">{losing_days}</div>
-                <div class="stat-label">Losing Days</div>
-            </div>
-        </div>
-        
-        <div class="calendar-grid">
-            <div class="calendar-day-header">Sun</div>
-            <div class="calendar-day-header">Mon</div>
-            <div class="calendar-day-header">Tue</div>
-            <div class="calendar-day-header">Wed</div>
-            <div class="calendar-day-header">Thu</div>
-            <div class="calendar-day-header">Fri</div>
-            <div class="calendar-day-header">Sat</div>
-    """
-    
-    for week in cal:
-        for day in week:
-            if day == 0:
-                calendar_html += '<div class="calendar-day empty-day"></div>'
-            else:
-                date_obj = datetime(year, month, day).date()
-                day_data = daily_stats[daily_stats['Date'] == date_obj]
-                
-                if not day_data.empty:
-                    profit = day_data.iloc[0]['profit']
-                    trades = int(day_data.iloc[0]['trades'])
-                    
-                    if profit > 0:
-                        day_class = "positive-day"
-                    elif profit < 0:
-                        day_class = "negative-day"
-                    else:
-                        day_class = "neutral-day"
-                    
-                    calendar_html += f"""
-                    <div class="calendar-day {day_class}" title="Día {day}: ${profit:,.2f} ({trades} trades)">
-                        <div class="day-number">{day}</div>
-                        <div class="day-profit">${profit:,.0f}</div>
-                        <div class="day-trades">{trades} trades</div>
-                    </div>
-                    """
-                else:
-                    calendar_html += f"""
-                    <div class="calendar-day neutral-day">
-                        <div class="day-number">{day}</div>
-                    </div>
-                    """
-    
-    calendar_html += """
-        </div>
-    </div>
-    """
-    
-    return calendar_html
 
 st.markdown('<h1 class="main-header">📊 Trading Analytics Dashboard</h1>', unsafe_allow_html=True)
 
@@ -367,31 +168,6 @@ if not st.session_state.trades_df.empty:
     df_sorted = df.sort_values('Close Time')
     df_sorted['Cumulative_Profit'] = df_sorted['Profit (USD)'].cumsum()
     df_sorted['Trade_Number'] = range(1, len(df_sorted) + 1)
-    
-    # NUEVO: Calendario de Trading
-    st.markdown("---")
-    st.subheader("📅 Calendario de Trading")
-    
-    # Selector de mes y año para el calendario
-    col1, col2 = st.columns([1, 3])
-    with col1:
-        # Obtener años disponibles en los datos
-        available_years = sorted(df['Close Time'].dt.year.unique())
-        if available_years:
-            selected_year = st.selectbox("Año", available_years, index=len(available_years)-1)
-            
-            # Obtener meses disponibles para el año seleccionado
-            year_data = df[df['Close Time'].dt.year == selected_year]
-            available_months = sorted(year_data['Close Time'].dt.month.unique())
-            
-            if available_months:
-                month_names = [calendar.month_name[m] for m in available_months]
-                selected_month_name = st.selectbox("Mes", month_names, index=len(month_names)-1)
-                selected_month = available_months[month_names.index(selected_month_name)]
-                
-                # Generar y mostrar el calendario
-                calendar_html = create_trading_calendar(df, selected_year, selected_month)
-                st.markdown(calendar_html, unsafe_allow_html=True)
     
     # Métricas clave
     st.markdown("---")
